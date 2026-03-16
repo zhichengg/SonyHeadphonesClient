@@ -21,6 +21,7 @@ static constexpr int kXm3AmbientLevelMaxRaw = CommandSerializer::XM3_LEVEL_AMBIE
 @property (strong) NSMenuItem *connectDisconnectItem;
 @property (strong) NSMenuItem *reconnectLastDeviceItem;
 @property (strong) NSMenuItem *focusOnVoiceItem;
+@property (strong) NSMenuItem *syncVolumeItem;
 @property (strong) NSMenuItem *ancEnabledItem;
 @property (strong) NSMenuItem *ancModeMenuItem;
 @property (strong) NSMenu *ancModeMenu;
@@ -232,6 +233,7 @@ typedef NS_ENUM(NSInteger, XM3ANCMode) {
     BOOL canSetAncLevel = canControlANC && headphones->isSetAsmLevelAvailable();
     XM3ANCMode mode = [self currentANCMode];
     BOOL ambientMode = mode == XM3ANCModeAmbientSound;
+    self.syncVolumeItem.enabled = connected;
     self.ancEnabledItem.enabled = canControlANC;
     self.ancEnabledItem.state = ancEnabled ? NSControlStateValueOn : NSControlStateValueOff;
     self.ancModeMenuItem.enabled = canControlANC;
@@ -354,6 +356,28 @@ typedef NS_ENUM(NSInteger, XM3ANCMode) {
     [self applyFocusOnVoiceDesiredState:shouldEnable sender:sender];
 }
 
+- (IBAction)syncVolumeFromStatusItem:(id)sender {
+    if (!bt.isConnected()) return;
+
+    // Read the current system output volume (0–100).
+    NSAppleScript *getScript = [[NSAppleScript alloc] initWithSource:@"output volume of (get volume settings)"];
+    NSAppleEventDescriptor *result = [getScript executeAndReturnError:nil];
+    if (!result) return;
+
+    NSInteger vol = [result int32Value];
+    // Nudge by ±1 to force macOS to re-send the AVRCP Absolute Volume
+    // command, resyncing the headphone's internal volume with the Mac level.
+    NSInteger nudged = (vol > 0) ? vol - 1 : 1;
+
+    NSString *nudgeSource = [NSString stringWithFormat:@"set volume output volume %ld", (long)nudged];
+    [[[NSAppleScript alloc] initWithSource:nudgeSource] executeAndReturnError:nil];
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 100 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
+        NSString *restoreSource = [NSString stringWithFormat:@"set volume output volume %ld", (long)vol];
+        [[[NSAppleScript alloc] initWithSource:restoreSource] executeAndReturnError:nil];
+    });
+}
+
 - (IBAction)quitFromStatusItem:(id)sender {
     [NSApp terminate:self];
 }
@@ -442,6 +466,10 @@ typedef NS_ENUM(NSInteger, XM3ANCMode) {
     self.focusOnVoiceItem = [[NSMenuItem alloc] initWithTitle:@"Focus on Voice" action:@selector(toggleFocusOnVoiceFromStatusItem:) keyEquivalent:@""];
     self.focusOnVoiceItem.target = self;
     [self.statusMenu addItem:self.focusOnVoiceItem];
+
+    self.syncVolumeItem = [[NSMenuItem alloc] initWithTitle:@"Sync Volume" action:@selector(syncVolumeFromStatusItem:) keyEquivalent:@""];
+    self.syncVolumeItem.target = self;
+    [self.statusMenu addItem:self.syncVolumeItem];
 
     [self.statusMenu addItem:[NSMenuItem separatorItem]];
     NSMenuItem *quitItem = [[NSMenuItem alloc] initWithTitle:@"Quit SonyHeadphonesClient" action:@selector(quitFromStatusItem:) keyEquivalent:@"q"];

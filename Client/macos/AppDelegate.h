@@ -12,7 +12,7 @@
 #import "Headphones.h"
 #import "MacOSBluetoothConnector.h"
 
-@interface AppDelegate : NSObject <NSApplicationDelegate>
+@interface AppDelegate : NSObject <NSApplicationDelegate, NSWindowDelegate>
     @property (weak) NSWindow* window;
 
 @end

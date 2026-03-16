@@ -4,8 +4,6 @@ constexpr unsigned char ESCAPED_BYTE_SENTRY = 61;
 constexpr unsigned char ESCAPED_60 = 44;
 constexpr unsigned char ESCAPED_61 = 45;
 constexpr unsigned char ESCAPED_62 = 46;
-constexpr int MAX_STEPS_WH_1000_XM3 = 19;
-
 namespace CommandSerializer
 {
 	Buffer _escapeSpecials(const Buffer& src)
@@ -155,25 +153,41 @@ namespace CommandSerializer
 
 	NC_DUAL_SINGLE_VALUE getDualSingleForAsmLevel(char asmLevel)
 	{
-		NC_DUAL_SINGLE_VALUE val = NC_DUAL_SINGLE_VALUE::OFF;
-		if (asmLevel > MAX_STEPS_WH_1000_XM3)
+		if (asmLevel == XM3_LEVEL_NOISE_CANCELLING)
 		{
-			throw std::runtime_error("Exceeded max steps");
+			return NC_DUAL_SINGLE_VALUE::DUAL;
 		}
-		else if (asmLevel == 1)
+		if (asmLevel == XM3_LEVEL_WIND_NOISE_REDUCTION)
 		{
-			val = NC_DUAL_SINGLE_VALUE::SINGLE;
+			return NC_DUAL_SINGLE_VALUE::SINGLE;
 		}
-		else if (asmLevel == 0)
+		if (asmLevel >= XM3_LEVEL_AMBIENT_MIN && asmLevel <= XM3_LEVEL_AMBIENT_MAX)
 		{
-			val = NC_DUAL_SINGLE_VALUE::DUAL;
+			return NC_DUAL_SINGLE_VALUE::OFF;
 		}
-		return val;
+		throw std::runtime_error("Exceeded XM3 ANC mode range");
+	}
+
+	char normalizeAsmLevelForPayload(char asmLevel)
+	{
+		if (asmLevel == XM3_LEVEL_NOISE_CANCELLING || asmLevel == XM3_LEVEL_WIND_NOISE_REDUCTION)
+		{
+			// Not used by the headset in NC/Wind modes, but keep deterministic values.
+			return 0;
+		}
+		if (asmLevel >= XM3_LEVEL_AMBIENT_MIN && asmLevel <= XM3_LEVEL_AMBIENT_MAX)
+		{
+			// XM3 uses reversed ordering on wire:
+			// UI ambient 1 (least passthrough) -> payload 19, UI ambient 20 -> payload 0.
+			return static_cast<char>(XM3_LEVEL_AMBIENT_MAX - asmLevel);
+		}
+		throw std::runtime_error("Exceeded XM3 ANC mode range");
 	}
 
 	Buffer serializeNcAndAsmSetting(NC_ASM_EFFECT ncAsmEffect, NC_ASM_SETTING_TYPE ncAsmSettingType, ASM_SETTING_TYPE asmSettingType, ASM_ID asmId, char asmLevel)
 	{
 		Buffer ret;
+		auto encodedLevel = normalizeAsmLevelForPayload(asmLevel);
 		ret.push_back(static_cast<unsigned char>(COMMAND_TYPE::NCASM_SET_PARAM));
 		ret.push_back(static_cast<unsigned char>(NC_ASM_INQUIRED_TYPE::NOISE_CANCELLING_AND_AMBIENT_SOUND_MODE));
 		ret.push_back(static_cast<unsigned char>(ncAsmEffect));
@@ -181,7 +195,7 @@ namespace CommandSerializer
 		ret.push_back(static_cast<unsigned char>(getDualSingleForAsmLevel(asmLevel)));
 		ret.push_back(static_cast<unsigned char>(asmSettingType));
 		ret.push_back(static_cast<unsigned char>(asmId));
-		ret.push_back(asmLevel);
+		ret.push_back(encodedLevel);
 		return ret;
 	}
 
@@ -196,4 +210,3 @@ namespace CommandSerializer
 	}
 
 }
-

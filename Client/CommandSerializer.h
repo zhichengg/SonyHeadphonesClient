@@ -11,6 +11,11 @@ constexpr unsigned int ASM_LEVEL_DISABLED = -1;
 
 namespace CommandSerializer
 {
+	constexpr int XM3_LEVEL_NOISE_CANCELLING = 0;
+	constexpr int XM3_LEVEL_WIND_NOISE_REDUCTION = 1;
+	constexpr int XM3_LEVEL_AMBIENT_MIN = 2;  // Ambient 1
+	constexpr int XM3_LEVEL_AMBIENT_MAX = 21; // Ambient 20
+
 	struct Message
 	{
 		DATA_TYPE dataType;
@@ -39,7 +44,7 @@ namespace CommandSerializer
 	Message unpackBtMessage(const Buffer& src);
 
 	NC_DUAL_SINGLE_VALUE getDualSingleForAsmLevel(char asmLevel);
+	char normalizeAsmLevelForPayload(char asmLevel);
 	Buffer serializeNcAndAsmSetting(NC_ASM_EFFECT ncAsmEffect, NC_ASM_SETTING_TYPE ncAsmSettingType, ASM_SETTING_TYPE asmSettingType, ASM_ID asmId, char asmLevel);
 	Buffer serializeVPTSetting(VPT_INQUIRED_TYPE type, unsigned char preset);
 }
-

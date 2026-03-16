@@ -20,7 +20,7 @@ bool Headphones::getAmbientSoundControl()
 
 bool Headphones::isFocusOnVoiceAvailable()
 {
-	return this->_ambientSoundControl.current && this->_asmLevel.current > MINIMUM_VOICE_FOCUS_STEP;
+	return this->_ambientSoundControl.current && this->_asmLevel.current >= CommandSerializer::XM3_LEVEL_AMBIENT_MIN;
 }
 
 void Headphones::setFocusOnVoice(bool val)
